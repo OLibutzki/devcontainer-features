@@ -5,7 +5,7 @@ Dev container features published to GitHub Container Registry, following the
 
 | Feature | Version | Description |
 | --- | --- | --- |
-| [`claude-code`](src/claude-code) | `0.0.1` | Installs Anthropic's Claude Code CLI with the recommended native installer — no Node.js required. |
+| [`claude-code`](src/claude-code) | `0.0.2` | Installs Anthropic's Claude Code CLI with the recommended native installer — no Node.js required. |
 
 > **The 0.x stream is experimental.** Expect breaking changes: options can be renamed, removed or have
 > their defaults reversed in any release before `1.0.0`. Semver puts no compatibility promise on 0.x, so a
@@ -18,7 +18,7 @@ Dev container features published to GitHub Container Registry, following the
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "remoteUser": "vscode",
     "features": {
-        "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.1": {}
+        "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2": {}
     },
     // Sign in automatically when the host has a token; falls back to browser
     // login when it does not. Safe to commit — see the notes.

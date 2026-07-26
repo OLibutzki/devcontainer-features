@@ -1,7 +1,7 @@
 
 # Claude Code (claude-code)
 
-Installs Anthropic's Claude Code CLI using the recommended native installer (https://claude.ai/install.sh) — no Node.js required.
+Installs Anthropic's Claude Code CLI using the recommended native installer.
 
 ## Example Usage
 
@@ -81,7 +81,7 @@ prefer it.
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "remoteUser": "vscode",
     "features": {
-        "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.1": {
+        "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2": {
             "version": "stable"
         }
     }
@@ -297,6 +297,35 @@ Notes on the edges of that list:
 * The allowlist is a **runtime** boundary. This feature downloads from `claude.ai` at **image build** time,
   before it applies — the template's README lists build-time feature downloads (and DNS) as residual
   channels outside its model.
+
+## Behind a build-time proxy
+
+If your builds go through an HTTP proxy — a corporate egress proxy, or a nested build inside an already
+restricted container — set it the way Docker expects and the feature follows it:
+
+```bash
+docker build --build-arg HTTPS_PROXY=http://proxy:3128 ...
+```
+
+or, for every build, in `~/.docker/config.json`:
+
+```json
+{ "proxies": { "default": { "httpProxy": "http://proxy:3128", "httpsProxy": "http://proxy:3128" } } }
+```
+
+`HTTP_PROXY`, `HTTPS_PROXY`, `FTP_PROXY` and `NO_PROXY` (either case) are forwarded to the native installer.
+This needs saying because the installer is per-user and therefore runs through `su -`, which starts a login
+shell from a *clean* environment. Before 0.0.2 the variables were lost there, and the symptom was confusing:
+`apt-get` succeeded — it runs as root, in the RUN environment — and then the build failed on
+`curl: (6) Could not resolve host: claude.ai`. The feature now re-exports them across that boundary and says
+so in the build log:
+
+```
+Forwarding the build-time proxy configuration to the installer.
+```
+
+Note that `claude.ai` and `downloads.claude.ai` have to be reachable *through the proxy* for the install to
+work at all, and `api.anthropic.com` for the CLI to be usable afterwards.
 
 ## Organization policy
 
