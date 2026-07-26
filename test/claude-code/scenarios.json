@@ -1,0 +1,40 @@
+{
+    "stable_channel": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "version": "stable"
+            }
+        }
+    },
+    "autoupdater_disabled": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "disableAutoUpdater": true
+            }
+        }
+    },
+    "onboarding_disabled": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "autoOnboarding": false
+            }
+        }
+    },
+    "empty_oauth_token": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {}
+        },
+        "containerEnv": {
+            "CLAUDE_CODE_OAUTH_TOKEN": "",
+            "ANTHROPIC_API_KEY": ""
+        }
+    }
+}
