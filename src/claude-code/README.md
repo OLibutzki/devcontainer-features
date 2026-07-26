@@ -7,7 +7,7 @@ Installs Anthropic's Claude Code CLI using the recommended native installer (htt
 
 ```json
 "features": {
-    "ghcr.io/olibutzki/devcontainer-features/claude-code:0": {}
+    "ghcr.io/OLibutzki/devcontainer-features/claude-code:0": {}
 }
 ```
 
@@ -341,4 +341,4 @@ Ubuntu base still works, but that path is not exercised by CI.
 
 ---
 
-_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/olibutzki/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._
+_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/OLibutzki/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._
