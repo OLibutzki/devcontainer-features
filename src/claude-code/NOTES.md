@@ -302,5 +302,11 @@ this floor rather than trying to work around it.
 
 ## OS support
 
-Debian/Ubuntu on x64 or arm64. Other base images fail the build with a clear message rather than installing
-something half-working.
+Debian/Ubuntu-based **Dev Container** images on x64 or arm64 — `mcr.microsoft.com/devcontainers/base:ubuntu`
+and `:debian` are what CI covers, and images derived from them work the same way. A non-apt base fails the
+build with a clear message rather than installing something half-working.
+
+Bare `ubuntu:latest` / `debian:latest` are **not** supported. They lack much of what a dev container
+assumes, including `bubblewrap`, which Claude Code requires in order to scrub credentials from subprocess
+environments. The feature installs `bubblewrap` if it is missing, so a custom Dockerfile on a Debian or
+Ubuntu base still works, but that path is not exercised by CI.

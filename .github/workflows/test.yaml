@@ -14,10 +14,12 @@ jobs:
       matrix:
         features:
           - claude-code
+        # Dev Container base images only. Bare debian:latest / ubuntu:latest are deliberately not
+        # supported: they lack too much of what a dev container assumes (including bubblewrap, which
+        # Claude Code needs for the subprocess env scrub).
         baseImage:
-          - debian:latest
-          - ubuntu:latest
           - mcr.microsoft.com/devcontainers/base:ubuntu
+          - mcr.microsoft.com/devcontainers/base:debian
     steps:
       - uses: actions/checkout@v4
 

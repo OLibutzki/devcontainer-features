@@ -116,7 +116,14 @@ echo "Installing Claude Code ('${VERSION}') for user '${USERNAME}' (home: ${USER
 
 # jq is not optional: both the settings merge below and the onboarding script that runs on every
 # container start use it to patch JSON config non-destructively.
-install_if_missing curl:curl bash:bash jq:jq
+#
+# bubblewrap is not optional either: this feature sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1, and Claude Code
+# implements the scrub by running subprocesses under bwrap. Without it, `claude` refuses to start at all
+# ("bubblewrap is required for subprocess env scrubbing and isolation"), which fails the build.
+#
+# The supported Dev Container base images already ship bwrap, so this is a no-op there. It is kept for
+# images built from a custom Dockerfile on a Debian/Ubuntu base, which often do not.
+install_if_missing curl:curl bash:bash jq:jq bwrap:bubblewrap
 apt_install ca-certificates
 
 # ---------------------------------------------------------------------------------------------------------
@@ -249,14 +256,22 @@ fi
 
 rm -rf /var/lib/apt/lists/*
 
-INSTALLED_VERSION="$(run_as_user 'claude --version' 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+# Smoke test. `claude --version` has to actually run: a CLI that cannot start -- because a dependency of
+# the subprocess scrub is missing, say -- must fail the build here rather than bake a broken `claude` into
+# the image and report success.
+if ! VERSION_OUTPUT="$(run_as_user 'claude --version' 2>&1)"; then
+    echo "(!) claude-code: installed, but 'claude --version' failed to run. Last lines:" >&2
+    printf '%s\n' "${VERSION_OUTPUT}" | tail -5 | sed 's/^/    /' >&2
+    exit 1
+fi
+
+INSTALLED_VERSION="$(printf '%s' "${VERSION_OUTPUT}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
 
 # Catches what the pre-check cannot: a 'latest'/'stable' channel that resolved to something older than the
-# minimum. Only enforced when the version actually parsed -- an unreadable `claude --version` is a
-# different failure and should not be reported as a version-policy violation.
+# minimum. Only enforced when the version actually parsed.
 if [ -n "${INSTALLED_VERSION}" ] && version_lt "${INSTALLED_VERSION}" "${MIN_VERSION}"; then
     too_old "${INSTALLED_VERSION}"
 fi
 
-echo "Claude Code installed: ${INSTALLED_VERSION:-version check skipped}"
+echo "Claude Code installed: ${INSTALLED_VERSION:-unknown}"
 echo "Done."
