@@ -72,13 +72,6 @@ docker compose -f .devcontainer/docker-compose.yml logs -f egress
 This turns "the tool mysteriously hangs" into a specific hostname you can make
 a decision about, which is the point of the whole arrangement.
 
-Mechanically, Squid writes to files under `/var/log/squid/` and the
-`ubuntu/squid` entrypoint tails them to the container's stdout. Squid cannot
-write to `/dev/stdout` directly — it drops to the unprivileged `proxy` user,
-which cannot reopen Docker's stdout pipe, and dies with a `FATAL` if you tell
-it to. If you swap `squidImage` for an image without that entrypoint, expect
-`docker compose logs egress` to go quiet and read the log files instead.
-
 ## Verifying it is on
 
 ```bash
@@ -142,22 +135,8 @@ Two consequences worth knowing:
   reaches the internet, so the boundary is unchanged. `verify-egress.sh` is
   what settles that; run it after any change here.
 
-### Why the feature tests work in here
-
-The builds those tests run are *proxied* — they happen on the inner daemon,
-inside the boundary — and that is a stricter environment than the host. It
-found a real bug, fixed in `claude-code` 0.0.2: `install.sh` runs the native
-installer through `su - "${USERNAME}"`, a login shell starts from a clean
-environment, so `HTTP_PROXY` never reached `curl` and the build died on
-`Could not resolve host: claude.ai`. `apt-get` in the same build worked, because
-it runs as root in the RUN environment — which is what made it confusing.
-
-`post-create.sh` writes the `proxies` block in `~/.docker/config.json`; that is
-what makes the Docker CLI pass the proxy into every build as an implicit build
-arg. Without it the inner builds have no proxy to forward and the failure comes
-back.
-
-So run the matrix in here — it exercises a path the host cannot:
+Feature-test builds started in here go through the proxy, which the host's do
+not — a stricter environment, and the reason to run the matrix from inside:
 
 ```bash
 devcontainer features test --skip-scenarios -f claude-code -i mcr.microsoft.com/devcontainers/base:ubuntu .

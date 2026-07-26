@@ -1,7 +1,7 @@
 {
     "name": "Claude Code",
     "id": "claude-code",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Installs Anthropic's Claude Code CLI using the recommended native installer.",
     "documentationURL": "https://github.com/olibutzki/devcontainer-features/tree/main/src/claude-code",
     "licenseURL": "https://github.com/olibutzki/devcontainer-features/blob/main/LICENSE",
@@ -20,7 +20,7 @@
                 "stable"
             ],
             "default": "latest",
-            "description": "Release channel ('latest' or 'stable') or an exact version such as '2.1.89'. Must be 2.1.83 or newer: the install fails on an older pin, because CLAUDE_CODE_SUBPROCESS_ENV_SCRUB does not exist before then and the credential would leak into every subprocess Claude Code spawns. The value chosen here also becomes the default auto-update channel."
+            "description": "Release channel ('latest' or 'stable') or an exact version such as '2.1.89'. The value chosen here also becomes the default auto-update channel."
         },
         "disableAutoUpdater": {
             "type": "boolean",
@@ -45,9 +45,6 @@
                 "com.anthropic.code.plugin"
             ]
         }
-    },
-    "containerEnv": {
-        "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"
     },
     "installsAfter": [
         "ghcr.io/devcontainers/features/common-utils"

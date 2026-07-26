@@ -38,36 +38,6 @@ if ! printf '%s' "${VERSION}" | grep -Eq '^[A-Za-z0-9._-]+$'; then
 fi
 
 # ---------------------------------------------------------------------------------------------------------
-# Minimum supported Claude Code version.
-#
-# CLAUDE_CODE_SUBPROCESS_ENV_SCRUB, which this feature sets via containerEnv, arrived in 2.1.83. On an
-# older release the variable is silently ignored: Claude Code still authenticates with the token, but every
-# subprocess it spawns inherits the credential. Installing an older version would therefore hand out a
-# configuration that looks hardened and is not, so refuse rather than warn.
-# ---------------------------------------------------------------------------------------------------------
-MIN_VERSION="2.1.83"
-
-# version_lt A B -> true when A is strictly older than B.
-version_lt() {
-    [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$1" ]
-}
-
-too_old() {
-    echo "(!) claude-code: version '$1' is older than the minimum supported ${MIN_VERSION}." >&2
-    echo "    This feature sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 so the credential is stripped from the" >&2
-    echo "    environment of the subprocesses Claude Code spawns. That variable does nothing before" >&2
-    echo "    ${MIN_VERSION}, so an older pin would silently leak the token to every command the agent runs." >&2
-    echo "    Use 'latest', 'stable', or an exact version >= ${MIN_VERSION}." >&2
-    exit 1
-}
-
-# Reject an out-of-range pin before downloading anything. Channels ('latest'/'stable') resolve at install
-# time and are checked against the installed version further down instead.
-if printf '%s' "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' && version_lt "${VERSION}" "${MIN_VERSION}"; then
-    too_old "${VERSION}"
-fi
-
-# ---------------------------------------------------------------------------------------------------------
 # Packages
 # ---------------------------------------------------------------------------------------------------------
 APT_UPDATED="false"
@@ -116,14 +86,7 @@ echo "Installing Claude Code ('${VERSION}') for user '${USERNAME}' (home: ${USER
 
 # jq is not optional: both the settings merge below and the onboarding script that runs on every
 # container start use it to patch JSON config non-destructively.
-#
-# bubblewrap is not optional either: this feature sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1, and Claude Code
-# implements the scrub by running subprocesses under bwrap. Without it, `claude` refuses to start at all
-# ("bubblewrap is required for subprocess env scrubbing and isolation"), which fails the build.
-#
-# The supported Dev Container base images already ship bwrap, so this is a no-op there. It is kept for
-# images built from a custom Dockerfile on a Debian/Ubuntu base, which often do not.
-install_if_missing curl:curl bash:bash jq:jq bwrap:bubblewrap
+install_if_missing curl:curl bash:bash jq:jq
 apt_install ca-certificates
 
 # ---------------------------------------------------------------------------------------------------------
@@ -165,13 +128,18 @@ if [ ! -x "${CLAUDE_BIN}" ]; then
 fi
 
 # ---------------------------------------------------------------------------------------------------------
-# Make ~/.local/bin discoverable, including for login shells that do not source the user's rc files.
-# Deliberately no /usr/local/bin/claude symlink: the native installer owns ~/.local/bin/claude and
-# shadowing it confuses `claude update` and `claude doctor`.
+# Shell setup, written once and installed in two places.
+#
+# 1. `~/.local/bin` on PATH. Deliberately no /usr/local/bin/claude symlink: the native installer owns
+#    ~/.local/bin/claude and shadowing it confuses `claude update` and `claude doctor`.
+# 2. Empty credentials dropped. "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}" in devcontainer.json expands to an
+#    EMPTY string when the host has no such variable -- the variable still ends up defined in the
+#    container, and Claude Code would see a blank credential instead of falling back to browser login.
+#
+# /etc/profile.d covers login shells, the system rc files cover interactive non-login ones; neither covers
+# the other, hence both. Kept POSIX so the same text works in bash, zsh and dash.
 # ---------------------------------------------------------------------------------------------------------
-PROFILE_SNIPPET='/etc/profile.d/claude-code.sh'
-mkdir -p /etc/profile.d
-cat > "${PROFILE_SNIPPET}" <<'EOF'
+SHELL_SNIPPET="$(cat <<'EOF'
 # Added by the 'claude-code' dev container feature.
 if [ -n "${HOME:-}" ] && [ -d "${HOME}/.local/bin" ]; then
     case ":${PATH}:" in
@@ -180,34 +148,19 @@ if [ -n "${HOME:-}" ] && [ -d "${HOME}/.local/bin" ]; then
     esac
     export PATH
 fi
-
-# Forwarding a credential with "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}" in devcontainer.json expands to an
-# EMPTY string when the host has no such variable -- the variable still ends up defined in the container.
-# Claude Code would then see a credential that is present but blank instead of falling back to browser
-# login, so drop empty ones.
 if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then unset CLAUDE_CODE_OAUTH_TOKEN; fi
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then unset ANTHROPIC_API_KEY; fi
 if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then unset ANTHROPIC_AUTH_TOKEN; fi
 EOF
-chmod 0644 "${PROFILE_SNIPPET}"
+)"
+
+mkdir -p /etc/profile.d
+printf '%s\n' "${SHELL_SNIPPET}" > /etc/profile.d/claude-code.sh
+chmod 0644 /etc/profile.d/claude-code.sh
 
 for rc in /etc/bash.bashrc /etc/bashrc /etc/zsh/zshenv; do
     if [ -f "${rc}" ] && ! grep -q 'claude-code dev container feature' "${rc}" 2>/dev/null; then
-        cat >> "${rc}" <<'EOF'
-
-# Added by the 'claude-code' dev container feature.
-if [ -n "${HOME:-}" ] && [ -d "${HOME}/.local/bin" ]; then
-    case ":${PATH}:" in
-        *":${HOME}/.local/bin:"*) ;;
-        *) export PATH="${HOME}/.local/bin:${PATH}" ;;
-    esac
-fi
-# An unset host variable forwarded via ${localEnv:...} arrives as an empty string; drop it so Claude Code
-# falls back to browser login rather than seeing a blank credential.
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then unset CLAUDE_CODE_OAUTH_TOKEN; fi
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then unset ANTHROPIC_API_KEY; fi
-if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then unset ANTHROPIC_AUTH_TOKEN; fi
-EOF
+        printf '\n%s\n' "${SHELL_SNIPPET}" >> "${rc}"
     fi
 done
 
@@ -221,29 +174,10 @@ SETTINGS_FILE="${SETTINGS_DIR}/settings.json"
 set_settings_env() {
     local key="$1" value="$2" tmp
     mkdir -p "${SETTINGS_DIR}"
-    if [ ! -f "${SETTINGS_FILE}" ]; then
-        printf '{\n  "env": {\n    "%s": "%s"\n  }\n}\n' "${key}" "${value}" > "${SETTINGS_FILE}"
-        return 0
-    fi
-    install_if_missing jq:jq
-    if type jq >/dev/null 2>&1; then
-        tmp="$(mktemp)"
-        jq --arg k "${key}" --arg v "${value}" '.env = ((.env // {}) + {($k): $v})' "${SETTINGS_FILE}" > "${tmp}"
-        mv "${tmp}" "${SETTINGS_FILE}"
-    elif type python3 >/dev/null 2>&1; then
-        python3 - "${SETTINGS_FILE}" "${key}" "${value}" <<'EOF'
-import json, sys
-path, key, value = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(path) as fh:
-    settings = json.load(fh)
-settings.setdefault("env", {})[key] = value
-with open(path, "w") as fh:
-    json.dump(settings, fh, indent=2)
-EOF
-    else
-        echo "(!) Could not merge ${key} into ${SETTINGS_FILE}: neither jq nor python3 available." >&2
-        exit 1
-    fi
+    [ -f "${SETTINGS_FILE}" ] || printf '{}\n' > "${SETTINGS_FILE}"
+    tmp="$(mktemp)"
+    jq --arg k "${key}" --arg v "${value}" '.env = ((.env // {}) + {($k): $v})' "${SETTINGS_FILE}" > "${tmp}"
+    mv "${tmp}" "${SETTINGS_FILE}"
 }
 
 if [ "${DISABLE_AUTOUPDATER}" = "true" ]; then
@@ -275,9 +209,9 @@ fi
 
 rm -rf /var/lib/apt/lists/*
 
-# Smoke test. `claude --version` has to actually run: a CLI that cannot start -- because a dependency of
-# the subprocess scrub is missing, say -- must fail the build here rather than bake a broken `claude` into
-# the image and report success.
+# Smoke test. `claude --version` has to actually run: a CLI that cannot start -- because a runtime
+# dependency is missing, say -- must fail the build here rather than bake a broken `claude` into the image
+# and report success.
 if ! VERSION_OUTPUT="$(run_as_user 'claude --version' 2>&1)"; then
     echo "(!) claude-code: installed, but 'claude --version' failed to run. Last lines:" >&2
     printf '%s\n' "${VERSION_OUTPUT}" | tail -5 | sed 's/^/    /' >&2
@@ -285,12 +219,6 @@ if ! VERSION_OUTPUT="$(run_as_user 'claude --version' 2>&1)"; then
 fi
 
 INSTALLED_VERSION="$(printf '%s' "${VERSION_OUTPUT}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
-
-# Catches what the pre-check cannot: a 'latest'/'stable' channel that resolved to something older than the
-# minimum. Only enforced when the version actually parsed.
-if [ -n "${INSTALLED_VERSION}" ] && version_lt "${INSTALLED_VERSION}" "${MIN_VERSION}"; then
-    too_old "${INSTALLED_VERSION}"
-fi
 
 echo "Claude Code installed: ${INSTALLED_VERSION:-unknown}"
 echo "Done."

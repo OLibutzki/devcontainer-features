@@ -12,6 +12,11 @@ installer (`curl -fsSL https://claude.ai/install.sh | bash -s <channel|version>`
 Not a Node/Python project — there is nothing to build. The "source" is `install.sh` plus JSON metadata,
 and the only way to know a change works is to run the feature tests against a real container.
 
+**The scope is deliberately small: install the CLI, with `version`, `disableAutoUpdater` and
+`autoOnboarding` as the only options.** Anything beyond that has been cut once already (see the scrub
+below); before adding a fourth option or a new install step, check that it cannot be a documented line in
+the consumer's `devcontainer.json` instead.
+
 ## Commands
 
 Requires Docker and `npm install -g @devcontainers/cli`.
@@ -31,9 +36,13 @@ devcontainer features generate-docs -p ./src -n olibutzki/devcontainer-features 
     --github-owner olibutzki --github-repo devcontainer-features
 
 # Exercise install.sh directly (fast for guard/validation logic — no devcontainer machinery).
-docker run --rm -e VERSION=2.1.82 -v "$PWD/src/claude-code:/f:ro" \
+docker run --rm -e VERSION=latest -v "$PWD/src/claude-code:/f:ro" \
     mcr.microsoft.com/devcontainers/base:ubuntu bash /f/install.sh
 ```
+
+On a Windows host the CLI needs `chmod` on `PATH` — without it every run builds the image and then dies
+with `Exectuable 'chmod' not found on PATH` before it can copy the test script in. Prepend Git's tools:
+`$env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"`.
 
 Releases are manual: bump `version` in `devcontainer-feature.json`, then run the
 **Release dev container features & Generate Documentation** workflow from the Actions tab on `main`.
@@ -41,10 +50,17 @@ Releases are manual: bump `version` in `devcontainer-feature.json`, then run the
 ## The repository's own dev container
 
 `.devcontainer/` dogfoods both shipped artifacts: the **published** feature
-(`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.1`, deliberately not a local `./src` reference)
-inside the **published** `egress-firewall` template, plus `docker-in-docker` so the test suite has a daemon.
-Consumer-side pieces the feature cannot automate — the `remoteEnv` token line, the `~/.claude` volume — are
-wired up there, so they are exercised rather than only documented.
+(`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2`) inside the **published** `egress-firewall`
+template, plus `docker-in-docker` so the test suite has a daemon. Consumer-side pieces the feature cannot
+automate — the `remoteEnv` token line, the `~/.claude` volume — are wired up there, so they are exercised
+rather than only documented.
+
+**It pins the published feature, not `./src`, and that is not just a preference:** a *local* Feature
+reference has to resolve to a folder **inside the `.devcontainer` directory**. `"../src/claude-code": {}`
+is rejected — the CLI does not allow the path to escape that folder. So dogfooding the working tree would
+mean duplicating or symlinking `src/claude-code` into `.devcontainer/`, and the pin is the honest option
+instead. The consequence to remember: **this container lags the working tree until a release goes out**,
+so it is not a check on uncommitted `install.sh` changes — the feature test matrix is.
 
 **The test matrix runs in there, and it is the stricter environment** — the inner builds go through the
 proxy, which the host's do not. That is how the `su -` proxy bug (fixed in 0.0.2, see below) was found.
@@ -60,14 +76,14 @@ folder gets *started* rather than rebuilt — `docker compose -p devcontainer-fe
 ## Testing discipline
 
 **Always re-run the full base-image matrix after changing `install.sh` or feature metadata**, not just
-`base:ubuntu`. A real bug shipped because `mcr.microsoft.com/devcontainers/base:ubuntu` happens to
-pre-install `bubblewrap` while other images do not — testing only that image hid a hard startup failure.
-Supported images are `mcr.microsoft.com/devcontainers/base:ubuntu` and `:debian`; bare `ubuntu:latest` /
-`debian:latest` are explicitly unsupported.
+`base:ubuntu`. The base images differ in what they pre-install, so a missing dependency can hide behind the
+one image you tested — that has already shipped a bug once (`bubblewrap`, back when the subprocess scrub
+made it a hard requirement). Supported images are `mcr.microsoft.com/devcontainers/base:ubuntu` and
+`:debian`; bare `ubuntu:latest` / `debian:latest` are explicitly unsupported.
 
-`devcontainer features test` can only assert that an install **succeeds**. Anything that must *fail*
-(currently the version floor) needs a bespoke job in `.github/workflows/test.yaml` — see
-`test-version-floor`.
+`devcontainer features test` can only assert that an install **succeeds**. Anything that must *fail* needs
+a bespoke job in `.github/workflows/test.yaml`. There is currently no such case — the version floor that
+used to be one was removed along with the scrub.
 
 ## Architecture
 
@@ -81,8 +97,8 @@ installer as that user via `su -`. Everything else is fallout from that choice.
 `postStartCommand`. Deliberately both: `~/.claude.json` can live on a volume that does not exist when the
 image is built, so a build-time-only write would be masked at runtime.
 
-**`devcontainer-feature.json`** — declares the VS Code extension + JetBrains plugin, and
-`containerEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`.
+**`devcontainer-feature.json`** — options, the `postStartCommand`, and the VS Code extension + JetBrains
+plugin. It sets no `containerEnv` at present.
 
 ### Decisions that look wrong but are not
 
@@ -92,16 +108,12 @@ image is built, so a build-time-only write would be masked at runtime.
 - **`hasCompletedOnboarding` goes in `~/.claude.json`**, *not* `~/.claude/settings.json`. Without it a
   `CLAUDE_CODE_OAUTH_TOKEN` login still stops at the interactive theme/login screen
   ([anthropics/claude-code#8938](https://github.com/anthropics/claude-code/issues/8938)).
-- **`bubblewrap` is a hard dependency.** `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` is implemented by running
-  subprocesses under `bwrap`; without it `claude` refuses to start *at all*, so the build dies. Do not
-  remove the install without also removing the scrub.
-- **`version` has an enforced floor of 2.1.83** (`MIN_VERSION` in `install.sh`) because the scrub variable
-  does not exist before then and is silently ignored — an older pin yields a config that looks hardened and
-  is not. Checked twice: before download for exact pins, and after install to catch a channel that resolved
-  low. Comparison uses `sort -V`, so `2.1.220 > 2.1.83 > 2.1.9` orders correctly.
-- **Empty credentials are unset in `/etc/profile.d/claude-code.sh`.** `${localEnv:X}` expands to an *empty
-  string*, not an absent variable, so without this a host with no token yields a blank credential instead
-  of falling back to browser login.
+- **Empty credentials are unset by the shell snippet.** `${localEnv:X}` expands to an *empty string*, not an
+  absent variable, so without this a host with no token yields a blank credential instead of falling back to
+  browser login. `install.sh` builds that snippet once into `SHELL_SNIPPET` and writes it to both
+  `/etc/profile.d/claude-code.sh` (login shells) and the system rc files (interactive non-login shells) —
+  neither location covers the other, so keep both, but keep them one string. It must stay POSIX: one of the
+  targets is `/etc/zsh/zshenv`.
 - **`run_as_user` re-exports the proxy variables into `su`.** `su -` starts a login shell, which begins from
   a clean environment, so a build-time `HTTP_PROXY` dies at that boundary and the installer's `curl` cannot
   resolve `claude.ai`. The failure is easy to misdiagnose because `apt-get` in the same build still works —
@@ -110,6 +122,16 @@ image is built, so a build-time-only write would be masked at runtime.
 - **Network egress is out of scope.** A feature runs inside an already-composed container and cannot create
   the topology an egress boundary needs. Docs point at the `egress-firewall` template instead. Do not add a
   firewall feature here.
+
+### The subprocess env scrub, removed on purpose
+
+`containerEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` was dropped for a lighter setup, and no shipped file
+records that it was ever there. It may come back — if it does, three things come back **together**, because
+the other two existed only to support it: the `containerEnv` entry; `bubblewrap` (Claude Code implements
+the scrub with `bwrap` and refuses to start *at all* without it, which the Dev Container base images hide
+because they pre-install it); and a `2.1.83` version floor plus its negative CI job (the variable is
+silently ignored before then, so an older pin looks hardened and is not). `git show` on the removal commit
+has the exact prose and tests.
 
 ### Feature metadata constraints (verified experimentally, `@devcontainers/cli` 0.87.0)
 
@@ -121,11 +143,16 @@ This governs what can and cannot be automated, and is easy to get wrong:
 | Feature | `remoteEnv` | ignored | ignored — not a Feature property |
 | `devcontainer.json` | `remoteEnv` | works | works |
 
-Consequences: a feature **can** set literal env vars (that is how the scrub flag ships) but **cannot**
-forward a host value, so `CLAUDE_CODE_OAUTH_TOKEN` forwarding stays a documented one-liner in the
+Consequences: a feature **can** set literal env vars but **cannot** forward a host value, so
+`CLAUDE_CODE_OAUTH_TOKEN` forwarding stays a documented one-liner in the
 consumer's `devcontainer.json`. Option values cannot be interpolated into `mounts`/`containerEnv` either,
 so those are always-on or absent — never gated by a boolean option. `${devcontainerId}` *is* supported in
 feature `mounts`. A consumer's `devcontainer.json` overrides feature `containerEnv`.
+
+One more, and it shapes how this repo can dogfood itself: **a local Feature reference must resolve to a
+folder inside the `.devcontainer` directory.** `"./claude-code": {}` works if the folder sits next to
+`devcontainer.json`; `"../src/claude-code": {}` is rejected. That is why `.devcontainer` pins the published
+feature instead of the working tree.
 
 ## Conventions
 

@@ -42,8 +42,7 @@ services:
       no_proxy: localhost,127.0.0.1,::1,egress
       # Optional operational telemetry, switched off rather than allowlisted.
       # devcontainer.json `containerEnv` is ignored for Compose-based containers,
-      # so project-wide env belongs here. (Feature `containerEnv` still applies —
-      # that is how CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 arrives.)
+      # so project-wide env belongs here. (Feature `containerEnv` still applies.)
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
 
   egress:
