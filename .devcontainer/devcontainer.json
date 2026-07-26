@@ -1,0 +1,54 @@
+{
+	"name": "devcontainer-features (egress-firewalled)",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "dev",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+	"shutdownAction": "stopCompose",
+	"remoteUser": "vscode",
+
+	// Features are downloaded by the devcontainer CLI / Docker daemon over the
+	// HOST network, before the restricted container exists — so they are NOT
+	// subject to the egress allowlist. That includes this collection's own
+	// claude-code feature and its curl to claude.ai. Everything that runs inside
+	// the started container is filtered. See .devcontainer/egress/README.md.
+	"features": {
+		// The published feature, deliberately not a local `./src/claude-code`
+		// reference: this container is meant to exercise what consumers get.
+		// Still 0.0.1 because 0.0.2 is not released yet — move the pin up after
+		// running the release workflow. (This build is not proxied, so it does
+		// not need 0.0.2's proxy fix; the feature *tests* run in here do.)
+		"ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.1": {
+			"version": "latest"
+		},
+		// The feature test suite builds and runs real containers.
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		// Only so that `npm i -g @devcontainers/cli` works in post-create.sh.
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		}
+	},
+
+	// A feature cannot substitute a host value, so forwarding the token is a
+	// consumer-side one-liner — this is the line src/claude-code/NOTES.md tells
+	// people to write. Empty on a host without a token, which the feature then
+	// unsets so browser login still works.
+	"remoteEnv": {
+		"CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"
+	},
+
+	// The proxy env vars live in docker-compose.yml so that they apply to every
+	// process in the container, not just to VS Code's terminals.
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+
+	// Confirm the firewall is actually enforcing before you trust it:
+	//    bash .devcontainer/egress/verify-egress.sh
+	"postAttachCommand": "echo 'Egress is restricted to .devcontainer/egress/allowed-domains.txt — run bash .devcontainer/egress/verify-egress.sh to check it.'",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"timonwong.shellcheck"
+			]
+		}
+	}
+}

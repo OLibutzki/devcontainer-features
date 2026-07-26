@@ -1,0 +1,81 @@
+services:
+  dev:
+    # The image this feature collection is primarily tested against — pinned to
+    # the LTS, because the floating `:ubuntu` tag now resolves to 26.04
+    # "resolute", for which the docker-in-docker Feature has no moby packages
+    # ("the 'moby' option is not supported on ubuntu 'resolute'"). The feature
+    # test matrix below still runs against the floating tag; this pin only
+    # affects the container the tests are driven *from*.
+    image: mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+    init: true
+    command: sleep infinity
+    # Required by the docker-in-docker Feature. It grants capabilities *inside*
+    # this container's namespaces; it does not create a route off the internal
+    # network, so the egress boundary below still holds.
+    privileged: true
+    volumes:
+      - ../..:/workspaces:cached
+      # Claude Code's credentials, settings and history. Without this you sign in
+      # again after every rebuild. Compose scopes the volume to this project.
+      - claude-config:/home/vscode/.claude
+      # Keep the inner Docker daemon's images out of the container's writable
+      # layer, so a rebuild does not re-pull every test base image.
+      - dind-var-lib-docker:/var/lib/docker
+    networks:
+      # The only network this container is on, and it has `internal: true`.
+      # There is no default route to the internet here — the sole way out is the
+      # egress proxy below. Unsetting the proxy variables does not grant access;
+      # it just removes the one path that works.
+      - egress-internal
+    depends_on:
+      egress:
+        condition: service_healthy
+    environment:
+      # Addressed by IP, not by the `egress` service name, because containers
+      # started by the *inner* Docker daemon are not on the Compose network and
+      # cannot resolve it. They route to this address through the dev container.
+      HTTP_PROXY: http://10.99.0.2:3128
+      HTTPS_PROXY: http://10.99.0.2:3128
+      http_proxy: http://10.99.0.2:3128
+      https_proxy: http://10.99.0.2:3128
+      NO_PROXY: localhost,127.0.0.1,::1,egress
+      no_proxy: localhost,127.0.0.1,::1,egress
+      # Optional operational telemetry, switched off rather than allowlisted.
+      # devcontainer.json `containerEnv` is ignored for Compose-based containers,
+      # so project-wide env belongs here. (Feature `containerEnv` still applies —
+      # that is how CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 arrives.)
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+
+  egress:
+    image: ubuntu/squid:latest
+    restart: unless-stopped
+    volumes:
+      - ./egress/squid.conf:/etc/squid/squid.conf:ro
+      - ./egress/allowed-domains.txt:/etc/squid/allowed-domains.txt:ro
+    networks:
+      egress-internal:
+        # Pinned so the proxy has an address that is stable across restarts and
+        # reachable from inside docker-in-docker, where Compose DNS does not go.
+        ipv4_address: 10.99.0.2
+      egress-external: {}
+    # Intentionally no `ports:` — the proxy is reachable from the dev container
+    # and from nowhere else, not from the host and not from the LAN.
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/3128' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+networks:
+  egress-internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24
+  egress-external:
+    driver: bridge
+
+volumes:
+  claude-config:
+  dind-var-lib-docker:
