@@ -38,6 +38,25 @@ docker run --rm -e VERSION=2.1.82 -v "$PWD/src/claude-code:/f:ro" \
 Releases are manual: bump `version` in `devcontainer-feature.json`, then run the
 **Release dev container features & Generate Documentation** workflow from the Actions tab on `main`.
 
+## The repository's own dev container
+
+`.devcontainer/` dogfoods both shipped artifacts: the **published** feature
+(`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.1`, deliberately not a local `./src` reference)
+inside the **published** `egress-firewall` template, plus `docker-in-docker` so the test suite has a daemon.
+Consumer-side pieces the feature cannot automate — the `remoteEnv` token line, the `~/.claude` volume — are
+wired up there, so they are exercised rather than only documented.
+
+**The test matrix runs in there, and it is the stricter environment** — the inner builds go through the
+proxy, which the host's do not. That is how the `su -` proxy bug (fixed in 0.0.2, see below) was found.
+It depends on the `proxies` block `post-create.sh` writes to `~/.docker/config.json`; without it the inner
+builds get no proxy and fail on `Could not resolve host: claude.ai`.
+
+Two other things that bit during setup: the dev container pins `base:ubuntu-24.04`, because the floating
+`:ubuntu` tag now resolves to 26.04 "resolute", for which `docker-in-docker` has no moby packages; and
+`devcontainer up` passes `--no-recreate`, so a stale container from an earlier `.devcontainer` in this
+folder gets *started* rather than rebuilt — `docker compose -p devcontainer-features_devcontainer down
+--remove-orphans` first if the config looks ignored.
+
 ## Testing discipline
 
 **Always re-run the full base-image matrix after changing `install.sh` or feature metadata**, not just
@@ -83,6 +102,11 @@ image is built, so a build-time-only write would be masked at runtime.
 - **Empty credentials are unset in `/etc/profile.d/claude-code.sh`.** `${localEnv:X}` expands to an *empty
   string*, not an absent variable, so without this a host with no token yields a blank credential instead
   of falling back to browser login.
+- **`run_as_user` re-exports the proxy variables into `su`.** `su -` starts a login shell, which begins from
+  a clean environment, so a build-time `HTTP_PROXY` dies at that boundary and the installer's `curl` cannot
+  resolve `claude.ai`. The failure is easy to misdiagnose because `apt-get` in the same build still works —
+  it runs as root in the RUN environment. Do not simplify the export loop away; the repo's own dev container
+  is the regression test.
 - **Network egress is out of scope.** A feature runs inside an already-composed container and cannot create
   the topology an egress boundary needs. Docs point at the `egress-firewall` template instead. Do not add a
   firewall feature here.

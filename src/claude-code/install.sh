@@ -128,12 +128,31 @@ apt_install ca-certificates
 
 # ---------------------------------------------------------------------------------------------------------
 # Run the official installer as the target user
+#
+# `su -` starts a *login* shell, which deliberately begins from a clean environment. Behind a build-time
+# HTTP proxy that is fatal: Docker exposes the proxy to RUN through HTTP_PROXY/HTTPS_PROXY, apt picks it up
+# because it runs as root in that environment, and then the installer's curl -- one `su -` away -- does not,
+# and the build dies on "Could not resolve host: claude.ai". So re-export the proxy variables across the
+# boundary. Values are single-quoted for the shell `su -c` hands the command to; embedded quotes are escaped
+# rather than assumed absent.
 # ---------------------------------------------------------------------------------------------------------
+PROXY_EXPORTS=""
+for proxy_var in HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY http_proxy https_proxy ftp_proxy no_proxy; do
+    proxy_value="${!proxy_var-}"
+    [ -n "${proxy_value}" ] || continue
+    proxy_value="$(printf '%s' "${proxy_value}" | sed "s/'/'\\\\''/g")"
+    PROXY_EXPORTS="${PROXY_EXPORTS}export ${proxy_var}='${proxy_value}'; "
+done
+if [ -n "${PROXY_EXPORTS}" ]; then
+    echo "Forwarding the build-time proxy configuration to the installer."
+fi
+
 run_as_user() {
     if [ "${USERNAME}" = "root" ]; then
+        # No `su`, so this branch keeps the current environment and needs no help.
         env HOME="${USER_HOME}" bash -lc "$1"
     else
-        su - "${USERNAME}" -c "$1"
+        su - "${USERNAME}" -c "${PROXY_EXPORTS}$1"
     fi
 }
 

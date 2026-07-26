@@ -1,0 +1,71 @@
+# Egress allowlist for the dev container.
+#
+# One entry per line. A leading dot matches the domain and all its subdomains
+# (.example.com covers api.example.com); a bare entry matches only that exact
+# host. Applies to plain HTTP and to HTTPS, where it is matched against the
+# hostname in the CONNECT request.
+#
+# Anything not listed here is unreachable. After editing, reload the policy:
+#
+#   docker compose -f .devcontainer/docker-compose.yml restart egress
+#
+# This file must never be empty — Squid refuses to start on an empty ACL file.
+
+# --- Required for the dev container itself to start and attach ---------------
+update.code.visualstudio.com
+.vscode-cdn.net
+.vscode.blob.core.windows.net
+marketplace.visualstudio.com
+.gallerycdn.vsassets.io
+
+# --- Claude Code -------------------------------------------------------------
+# Per src/claude-code/NOTES.md, which is the list this container exists to check.
+api.anthropic.com
+claude.ai
+claude.com
+platform.claude.com
+downloads.claude.ai
+storage.googleapis.com
+code.claude.com
+
+# Not listed, deliberately:
+#   the two Datadog intake hosts — optional telemetry, turned off instead with
+#   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 in docker-compose.yml.
+#   mcp-proxy.anthropic.com    — only for claude.ai MCP connectors.
+#   bridge.claudeusercontent.com — only for Claude in Chrome.
+
+# --- Git and GitHub ----------------------------------------------------------
+# HTTPS remotes only; the proxy does not tunnel SSH, so git@github.com will not
+# work. .githubusercontent.com covers raw (the /release-notes changelog feed),
+# objects, and the pkg-containers blob store that ghcr.io redirects to.
+github.com
+.githubusercontent.com
+
+# --- Registries reached from inside the container ----------------------------
+# The inner Docker daemon and the devcontainer CLI run here, so their pulls are
+# filtered — unlike the outer build, which happens on the host network.
+ghcr.io
+mcr.microsoft.com
+.data.mcr.microsoft.com
+registry.npmjs.org
+# The devcontainer CLI's control manifest. Without it every command logs
+# "Failed to fetch control manifest: HTTP 403" — that 403 is Squid's, not the
+# server's. It is not fatal; the tests pass either way.
+containers.dev
+
+# --- apt, for images built by the feature tests ------------------------------
+# install.sh apt-installs jq and bubblewrap when they are missing, which is the
+# path base:debian takes. Without these the test matrix fails on that image.
+archive.ubuntu.com
+security.ubuntu.com
+azure.archive.ubuntu.com
+deb.debian.org
+
+# --- Anything else -----------------------------------------------------------
+#
+# Nothing else gets out. When something inside the container hangs or fails to
+# connect, the proxy log names the host it wanted:
+#
+#   docker compose -f .devcontainer/docker-compose.yml logs egress | grep TCP_DENIED
+#
+# Add it here only if you actually want that reachable.

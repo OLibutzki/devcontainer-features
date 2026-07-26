@@ -1,8 +1,8 @@
 {
     "name": "Claude Code",
     "id": "claude-code",
-    "version": "0.0.1",
-    "description": "Installs Anthropic's Claude Code CLI using the recommended native installer (https://claude.ai/install.sh) — no Node.js required.",
+    "version": "0.0.2",
+    "description": "Installs Anthropic's Claude Code CLI using the recommended native installer.",
     "documentationURL": "https://github.com/olibutzki/devcontainer-features/tree/main/src/claude-code",
     "licenseURL": "https://github.com/olibutzki/devcontainer-features/blob/main/LICENSE",
     "keywords": [
