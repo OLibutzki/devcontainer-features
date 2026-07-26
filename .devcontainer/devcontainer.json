@@ -15,8 +15,9 @@
 		// The published feature: this container exercises what consumers get.
 		// A local reference is not an option anyway — a local Feature has to sit
 		// inside the .devcontainer folder, and `../src/claude-code` is rejected.
-		// So this pin lags the working tree until a release goes out.
-		"ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2": {
+		// So this pin lags the working tree until a release goes out; move it up
+		// after running the release workflow.
+		"ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.3": {
 			"version": "latest"
 		},
 		// The feature test suite builds and runs real containers.

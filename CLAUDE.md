@@ -50,7 +50,7 @@ Releases are manual: bump `version` in `devcontainer-feature.json`, then run the
 ## The repository's own dev container
 
 `.devcontainer/` dogfoods both shipped artifacts: the **published** feature
-(`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2`) inside the **published** `egress-firewall`
+(`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.3`) inside the **published** `egress-firewall`
 template, plus `docker-in-docker` so the test suite has a daemon. Consumer-side pieces the feature cannot
 automate — the `remoteEnv` token line, the `~/.claude` volume — are wired up there, so they are exercised
 rather than only documented.

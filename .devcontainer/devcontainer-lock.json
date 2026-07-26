@@ -10,10 +10,10 @@
       "resolved": "ghcr.io/devcontainers/features/node@sha256:8c0de46939b61958041700ee89e3493f3b2e4131a06dc46b4d9423427d06e5f6",
       "integrity": "sha256:8c0de46939b61958041700ee89e3493f3b2e4131a06dc46b4d9423427d06e5f6"
     },
-    "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2": {
-      "version": "0.0.2",
-      "resolved": "ghcr.io/olibutzki/devcontainer-features/claude-code@sha256:98a8441362ef80aa37da480f4bddd4e0d7fb18d6dd0bf4fa9defae79ee2344ba",
-      "integrity": "sha256:98a8441362ef80aa37da480f4bddd4e0d7fb18d6dd0bf4fa9defae79ee2344ba"
+    "ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.3": {
+      "version": "0.0.3",
+      "resolved": "ghcr.io/olibutzki/devcontainer-features/claude-code@sha256:1dc91a53138591c9cd1a7f5ee0f39f8909df00c84f937e1b7020ff4fdd04b9da",
+      "integrity": "sha256:1dc91a53138591c9cd1a7f5ee0f39f8909df00c84f937e1b7020ff4fdd04b9da"
     }
   }
 }
