@@ -54,8 +54,8 @@ registry.npmjs.org
 containers.dev
 
 # --- apt, for images built by the feature tests ------------------------------
-# install.sh apt-installs jq and bubblewrap when they are missing, which is the
-# path base:debian takes. Without these the test matrix fails on that image.
+# install.sh apt-installs jq (and ca-certificates) when they are missing, which
+# is the path base:debian takes. Without these the test matrix fails there.
 archive.ubuntu.com
 security.ubuntu.com
 azure.archive.ubuntu.com

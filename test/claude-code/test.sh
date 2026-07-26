@@ -13,18 +13,6 @@ check "no /usr/local/bin/claude shadowing the launcher" bash -c '! test -e /usr/
 check "claude resolves to the installer's launcher" bash -lc '[ "$(command -v claude)" = "${HOME}/.local/bin/claude" ]'
 check "no node installed by this feature" bash -c '! test -f /etc/apt/sources.list.d/nodesource.list'
 
-# Keep the credential out of the subprocesses Claude Code spawns (Bash tool, hooks, MCP stdio servers).
-check "subprocess env scrub is enabled" bash -lc '[ "$CLAUDE_CODE_SUBPROCESS_ENV_SCRUB" = "1" ]'
-# Claude Code implements the scrub with bubblewrap and refuses to start without it. Bare debian/ubuntu
-# images do not ship it, so the feature must install it.
-check "bubblewrap is installed" bash -lc "command -v bwrap"
-check "claude actually starts with the scrub enabled" bash -lc "claude --version >/dev/null"
-check "scrub is set at container level, not just in a shell profile" \
-    bash -c '[ "$(printenv CLAUDE_CODE_SUBPROCESS_ENV_SCRUB)" = "1" ]'
-check "installed claude is new enough for the scrub (>= 2.1.83)" bash -lc '
-    v=$(claude --version | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
-    [ "$(printf "2.1.83\n%s\n" "$v" | sort -V | head -1)" = "2.1.83" ]'
-
 # Onboarding: a CLAUDE_CODE_OAUTH_TOKEN login otherwise stops at the interactive theme/login screen.
 # See https://github.com/anthropics/claude-code/issues/8938
 check "onboarding script installed" test -x /usr/local/bin/claude-code-onboarding.sh

@@ -13,8 +13,8 @@ fi
 #
 # The inner daemon inherits HTTP_PROXY from this container's environment, so
 # image *pulls* already go through Squid. Image *builds* do not: RUN steps get a
-# clean environment, so `apt-get install bubblewrap` and the native installer's
-# curl to claude.ai would hang inside a feature test build. The `proxies` block
+# clean environment, so apt-get and the native installer's curl to claude.ai
+# would hang inside a feature test build. The `proxies` block
 # makes the Docker CLI pass the proxy to every build as an implicit build arg,
 # which BuildKit exposes to RUN as environment variables.
 # ---------------------------------------------------------------------------
