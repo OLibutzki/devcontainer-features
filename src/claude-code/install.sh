@@ -86,7 +86,14 @@ echo "Installing Claude Code ('${VERSION}') for user '${USERNAME}' (home: ${USER
 
 # jq is not optional: both the settings merge below and the onboarding script that runs on every
 # container start use it to patch JSON config non-destructively.
-install_if_missing curl:curl bash:bash jq:jq
+#
+# bubblewrap (bwrap) and socat back Claude Code's sandboxed Bash tool. That sandbox is not something this
+# feature turns on -- it is gated by the CLI's own `sandbox.enabled`/`sandbox.failIfUnavailable` settings,
+# which can end up true from a user's or org's own settings.json, or from Anthropic's own default rollout,
+# entirely outside this feature's control. Without these two packages, a session that needs the sandbox
+# fails hard with "Sandbox is required but failed to initialize: ... socat not installed." instead of
+# quietly falling back, so both are installed unconditionally rather than guessed at.
+install_if_missing curl:curl bash:bash jq:jq bwrap:bubblewrap socat:socat
 apt_install ca-certificates
 
 # ---------------------------------------------------------------------------------------------------------

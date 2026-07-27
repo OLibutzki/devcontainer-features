@@ -13,6 +13,11 @@ check "no /usr/local/bin/claude shadowing the launcher" bash -c '! test -e /usr/
 check "claude resolves to the installer's launcher" bash -lc '[ "$(command -v claude)" = "${HOME}/.local/bin/claude" ]'
 check "no node installed by this feature" bash -c '! test -f /etc/apt/sources.list.d/nodesource.list'
 
+# Sandbox dependencies: the CLI's own sandboxed Bash tool (not this feature) can require these at runtime;
+# without them it hard-fails with "Sandbox is required but failed to initialize".
+check "bubblewrap installed (bwrap)" bash -c "command -v bwrap"
+check "socat installed" bash -c "command -v socat"
+
 # Onboarding: a CLAUDE_CODE_OAUTH_TOKEN login otherwise stops at the interactive theme/login screen.
 # See https://github.com/anthropics/claude-code/issues/8938
 check "onboarding script installed" test -x /usr/local/bin/claude-code-onboarding.sh

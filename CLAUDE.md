@@ -151,12 +151,12 @@ plugin. It sets no `containerEnv` at present.
 ### The subprocess env scrub, removed on purpose
 
 `containerEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` was dropped for a lighter setup, and no shipped file
-records that it was ever there. It may come back — if it does, three things come back **together**, because
-the other two existed only to support it: the `containerEnv` entry; `bubblewrap` (Claude Code implements
-the scrub with `bwrap` and refuses to start *at all* without it, which the Dev Container base images hide
-because they pre-install it); and a `2.1.83` version floor plus its negative CI job (the variable is
-silently ignored before then, so an older pin looks hardened and is not). `git show` on the removal commit
-has the exact prose and tests.
+records that it was ever there. It may come back — if it does, two things come back **with** it, because
+they existed only to support it: the `containerEnv` entry; and a `2.1.83` version floor plus its negative CI
+job (the variable is silently ignored before then, so an older pin looks hardened and is not). `git show` on
+the removal commit has the exact prose and tests. Note `bubblewrap` itself is *not* one of those things
+anymore — `install.sh` now installs it unconditionally for an unrelated reason, see "Sandboxed Bash tool
+dependencies" in `src/claude-code/NOTES.md`.
 
 ### Feature metadata constraints (verified experimentally, `@devcontainers/cli` 0.87.0)
 
