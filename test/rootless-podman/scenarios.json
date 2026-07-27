@@ -1,0 +1,17 @@
+{
+    "custom_remote_user": {
+        "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+        "remoteUser": "node",
+        "features": {
+            "rootless-podman": {}
+        }
+    },
+    "device_access": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "runArgs": ["--device=/dev/fuse", "--device=/dev/net/tun"],
+        "features": {
+            "rootless-podman": {}
+        }
+    }
+}

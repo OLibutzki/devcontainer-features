@@ -14,6 +14,7 @@ jobs:
       matrix:
         features:
           - claude-code
+          - rootless-podman
         # Dev Container base images only. Bare debian:latest / ubuntu:latest are deliberately not
         # supported: they lack too much of what a dev container assumes.
         baseImage:
@@ -35,6 +36,7 @@ jobs:
       matrix:
         features:
           - claude-code
+          - rootless-podman
     steps:
       - uses: actions/checkout@v4
 

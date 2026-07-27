@@ -5,17 +5,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A Dev Container **Feature collection** following the [devcontainers/feature-starter](https://github.com/devcontainers/feature-starter)
-conventions, containing one feature: `claude-code`, which installs the Claude Code CLI via the native
-installer (`curl -fsSL https://claude.ai/install.sh | bash -s <channel|version>`). Published to
-`ghcr.io/olibutzki/devcontainer-features/claude-code`.
+conventions, containing two features: `claude-code`, which installs the Claude Code CLI via the native
+installer (`curl -fsSL https://claude.ai/install.sh | bash -s <channel|version>`), and `rootless-podman`,
+which installs Podman configured to run rootless as a Docker-compatible container engine. Each is published
+to `ghcr.io/olibutzki/devcontainer-features/<feature-id>`.
 
-Not a Node/Python project — there is nothing to build. The "source" is `install.sh` plus JSON metadata,
-and the only way to know a change works is to run the feature tests against a real container.
+Not a Node/Python project — there is nothing to build. The "source" is each feature's `install.sh` plus JSON
+metadata, and the only way to know a change works is to run the feature tests against a real container.
 
-**The scope is deliberately small: install the CLI, with `version`, `disableAutoUpdater` and
-`autoOnboarding` as the only options.** Anything beyond that has been cut once already (see the scrub
-below); before adding a fourth option or a new install step, check that it cannot be a documented line in
-the consumer's `devcontainer.json` instead.
+**Both features keep a deliberately small scope.** `claude-code` installs the CLI, with `version`,
+`disableAutoUpdater` and `autoOnboarding` as its only options — anything beyond that has been cut once
+already (see the scrub below); before adding a fourth option or a new install step, check that it cannot be
+a documented line in the consumer's `devcontainer.json` instead. `rootless-podman` goes further and ships no
+options at all: the subuid/subgid range and runtime paths are fixed, and anything that depends on the
+consumer's `remoteUser`'s home directory or on `--device` flags is documented as a line the consumer adds,
+not automated (see "rootless-podman: device access is documented, not automated" below).
 
 ## Commands
 
@@ -122,6 +126,15 @@ plugin. It sets no `containerEnv` at present.
 - **Network egress is out of scope.** A feature runs inside an already-composed container and cannot create
   the topology an egress boundary needs. Docs point at the `egress-firewall` template instead. Do not add a
   firewall feature here.
+- **`rootless-podman`: device access is documented, not automated.** Rootless Podman needs `/dev/fuse` (for
+  `fuse-overlayfs`) and `/dev/net/tun` (for `slirp4netns`) to actually start containers. The feature declares
+  `capAdd: ["SYS_ADMIN"]` and the three `securityOpt` entries it needs directly in
+  `devcontainer-feature.json` — those are safe, aggregating top-level properties. Devices are different: a
+  bind-mounted device node is visible but not usable, because the container engine's device cgroup still
+  blocks it; only `--device` (or `privileged: true`) opens that up, and neither is a Feature-metadata
+  key that targets a single device. Setting `privileged: true` would defeat the point of a *rootless*
+  feature, so the two `--device` lines stay a consumer-side `runArgs` addition instead — same pattern as
+  `CLAUDE_CODE_OAUTH_TOKEN` forwarding for `claude-code`.
 
 ### The subprocess env scrub, removed on purpose
 
@@ -149,6 +162,15 @@ consumer's `devcontainer.json`. Option values cannot be interpolated into `mount
 so those are always-on or absent — never gated by a boolean option. `${devcontainerId}` *is* supported in
 feature `mounts`. A consumer's `devcontainer.json` overrides feature `containerEnv`.
 
+`capAdd`, `securityOpt`, `privileged`, `init` and `mounts` are also valid, aggregating top-level Feature
+properties — unlike `containerEnv`/`remoteEnv`, they are not subject to the `${localEnv:...}` restriction
+above, so a feature can declare them directly (`rootless-podman` does, for `capAdd`/`securityOpt`). A plain
+bind `mounts` entry for a device node (e.g. `/dev/fuse`) is *not* equivalent to `--device`, though: it makes
+the file visible but the container engine's device cgroup still blocks `open()`/`ioctl()` on it. Only
+`--device` (or the much broader `privileged: true`) adds the matching cgroup allow-rule, and there is no
+top-level Feature key for that — see `rootless-podman`'s NOTES.md for the consumer-side `runArgs` this
+forces.
+
 One more, and it shapes how this repo can dogfood itself: **a local Feature reference must resolve to a
 folder inside the `.devcontainer` directory.** `"./claude-code": {}` works if the folder sits next to
 `devcontainer.json`; `"../src/claude-code": {}` is rejected. That is why `.devcontainer` pins the published
@@ -156,9 +178,10 @@ feature instead of the working tree.
 
 ## Conventions
 
-- **`src/claude-code/README.md` is generated** from `devcontainer-feature.json` + `NOTES.md`. Never
-  hand-edit it; edit `NOTES.md` and regenerate. Note `generate-docs` renders only the `vscode`
-  customizations block and silently omits `jetbrains`, which is why NOTES names both integrations in prose.
+- **Every `src/<feature>/README.md` is generated** from that feature's `devcontainer-feature.json` +
+  `NOTES.md`. Never hand-edit it; edit `NOTES.md` and regenerate. Note `generate-docs` renders only the
+  `vscode` customizations block and silently omits `jetbrains`, which is why `claude-code`'s NOTES names
+  both integrations in prose.
 - **Shell scripts must be LF.** `.gitattributes` enforces it; CRLF in `install.sh` breaks the container
   build. Check before committing when working on Windows.
 - Option values arrive as uppercased env vars with the option name stripped of punctuation:

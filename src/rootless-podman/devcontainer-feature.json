@@ -1,0 +1,34 @@
+{
+    "name": "Rootless Podman",
+    "id": "rootless-podman",
+    "version": "0.0.1",
+    "description": "Installs rootless Podman as a Docker-compatible container engine (DOCKER_HOST, testcontainers) without requiring a privileged container.",
+    "documentationURL": "https://github.com/olibutzki/devcontainer-features/tree/main/src/rootless-podman",
+    "licenseURL": "https://github.com/olibutzki/devcontainer-features/blob/main/LICENSE",
+    "keywords": [
+        "podman",
+        "rootless",
+        "docker",
+        "containers",
+        "testcontainers"
+    ],
+    "options": {},
+    "containerEnv": {
+        "XDG_RUNTIME_DIR": "/var/lib/rootless-podman/run",
+        "DOCKER_HOST": "unix:///var/lib/rootless-podman/run/podman/podman.sock",
+        "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE": "/var/lib/rootless-podman/run/podman/podman.sock",
+        "TESTCONTAINERS_RYUK_DISABLED": "true"
+    },
+    "capAdd": [
+        "SYS_ADMIN"
+    ],
+    "securityOpt": [
+        "seccomp=unconfined",
+        "apparmor=unconfined",
+        "systempaths=unconfined"
+    ],
+    "postStartCommand": "/usr/local/bin/rootless-podman-start.sh",
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
