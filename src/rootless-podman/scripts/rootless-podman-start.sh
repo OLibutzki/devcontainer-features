@@ -13,7 +13,11 @@ SOCKET_DIR="${RUNTIME_DIR}/podman"
 SOCKET_PATH="${SOCKET_DIR}/podman.sock"
 LOG_FILE="${RUNTIME_DIR}/podman-service.log"
 
+# Created (and owned) here, not by install.sh: the remote user's UID may have been changed at container
+# start by updateRemoteUserUID, after install.sh already ran at build time. Creating it fresh at every
+# start means it is always owned by whichever UID is actually running this script.
 mkdir -p "${SOCKET_DIR}"
+chmod 700 "${RUNTIME_DIR}"
 
 # Already running and answering? Nothing to do.
 if [ -S "${SOCKET_PATH}" ] && podman --url "unix://${SOCKET_PATH}" info >/dev/null 2>&1; then

@@ -137,13 +137,19 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------------------
-# Runtime directory. Deliberately NOT under the user's home: this feature must work for any remoteUser, not
-# just vscode, so the home path is unknown at authoring time -- but devcontainer-feature.json needs a
+# Runtime base directory. Deliberately NOT under the user's home: this feature must work for any remoteUser,
+# not just vscode, so the home path is unknown at authoring time -- but devcontainer-feature.json needs a
 # literal, static path for containerEnv. A path outside HOME sidesteps that constraint entirely.
+#
+# The actual "run" subdirectory is NOT created/chowned here on purpose. Dev Container CLI's
+# updateRemoteUserUID (on by default on Linux hosts) changes the remote user's UID at CONTAINER START,
+# after this build-time script already ran -- a directory chowned to the build-time UID would end up owned
+# by a UID that no longer belongs to anyone, and the (now different) user could not write to it. So this
+# only prepares a sticky, world-writable base; rootless-podman-start.sh creates and owns "run" fresh on
+# every container start, once the user's final UID is already in effect.
 # ---------------------------------------------------------------------------------------------------------
-mkdir -p "${RUNTIME_DIR}"
-chown "${USERNAME}:${USER_GROUP}" "${RUNTIME_BASE}" "${RUNTIME_DIR}"
-chmod 700 "${RUNTIME_DIR}"
+mkdir -p "${RUNTIME_BASE}"
+chmod 1777 "${RUNTIME_BASE}"
 
 # ---------------------------------------------------------------------------------------------------------
 # Run as the target user. See claude-code/install.sh for the reasoning on why `su -` starts a login shell
@@ -164,6 +170,11 @@ run_as_user() {
 }
 
 # Reinitialize storage under the new config now, as the target user, rather than lazily on first `podman run`.
+# The runtime dir only needs to exist for this and the smoke test below; it is removed again at the very end
+# so the image does not ship it pre-owned by a UID that updateRemoteUserUID may later replace.
+mkdir -p "${RUNTIME_DIR}"
+chown "${USERNAME}:${USER_GROUP}" "${RUNTIME_DIR}"
+chmod 700 "${RUNTIME_DIR}"
 run_as_user 'podman system migrate' || true
 
 install -m 0755 "${SCRIPT_DIR}/scripts/rootless-podman-start.sh" /usr/local/bin/rootless-podman-start.sh
@@ -179,6 +190,8 @@ if ! VERSION_OUTPUT="$(run_as_user 'podman --version' 2>&1)"; then
     printf '%s\n' "${VERSION_OUTPUT}" | tail -5 | sed 's/^/    /' >&2
     exit 1
 fi
+
+rm -rf "${RUNTIME_DIR}"
 
 echo "Rootless Podman installed: ${VERSION_OUTPUT}"
 echo "Done."

@@ -80,6 +80,17 @@ consumer's `remoteUser` (which this feature does not and cannot know at authorin
 `~/.local/share/containers/runtime` sidesteps that constraint, at the cost of the directory not living on
 any volume you might mount over the user's home.
 
+### Why the runtime directory is created at container start, not at build time
+
+Only the base path (`/var/lib/rootless-podman`, mode `1777`) is created during the image build. The actual
+`run` subdirectory is created — and owned — by the `postStartCommand` script every time the container
+starts, not by `install.sh`. This matters because Dev Container CLI's `updateRemoteUserUID` (on by default
+on Linux hosts, though not on Docker Desktop for Mac/Windows) changes the remote user's UID *after* the
+image is built, to match the local user. A directory chowned at build time would end up owned by a UID
+nobody uses anymore, and `mkdir`/`podman system service` would then fail with `Permission denied` on first
+container start — which is exactly what happened in CI before this was fixed. Creating the directory fresh
+in `postStartCommand`, once the user's final UID is already in effect, avoids that entirely.
+
 ## Don't combine with docker-in-docker / docker-outside-of-docker
 
 Both of those features also set `DOCKER_HOST`. Feature `containerEnv` values are merged in installation

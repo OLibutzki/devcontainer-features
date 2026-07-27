@@ -135,6 +135,15 @@ plugin. It sets no `containerEnv` at present.
   key that targets a single device. Setting `privileged: true` would defeat the point of a *rootless*
   feature, so the two `--device` lines stay a consumer-side `runArgs` addition instead — same pattern as
   `CLAUDE_CODE_OAUTH_TOKEN` forwarding for `claude-code`.
+- **`rootless-podman`'s runtime directory is created at container start, never at build time.** Dev
+  Container CLI's `updateRemoteUserUID` (default on Linux hosts, not on Docker Desktop) changes the remote
+  user's UID after the image is built. `install.sh` only creates the base path
+  (`/var/lib/rootless-podman`, `1777`) at build time; chowning the `run` subdirectory to the build-time UID
+  broke on the first CI run with `mkdir: Permission denied`, because by container start that UID belonged to
+  no one anymore. The `postStartCommand` script creates and owns `run` fresh on every start instead, once the
+  final UID is in effect. If a future feature ever persists build-time-owned state for a non-root user,
+  check whether it can suffer the same failure on Linux CI runners even though it works locally on Docker
+  Desktop (which does not remap UIDs).
 
 ### The subprocess env scrub, removed on purpose
 
