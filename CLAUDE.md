@@ -53,11 +53,13 @@ Releases are manual: bump `version` in `devcontainer-feature.json`, then run the
 
 ## The repository's own dev container
 
-`.devcontainer/` dogfoods both shipped artifacts: the **published** feature
+`.devcontainer/` dogfoods both shipped features: the **published** `claude-code` feature
 (`ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2`) inside the **published** `egress-firewall`
-template, plus `docker-in-docker` so the test suite has a daemon. Consumer-side pieces the feature cannot
-automate — the `remoteEnv` token line, the `~/.claude` volume — are wired up there, so they are exercised
-rather than only documented.
+template, plus the **published** `rootless-podman` feature
+(`ghcr.io/olibutzki/devcontainer-features/rootless-podman:0.0.2`) so the test suite can build and run real
+containers without a privileged container. Consumer-side pieces neither feature can automate — the
+`remoteEnv` token line, the `~/.claude` volume, rootless-podman's `--device` entries — are wired up there,
+so they are exercised rather than only documented.
 
 **It pins the published feature, not `./src`, and that is not just a preference:** a *local* Feature
 reference has to resolve to a folder **inside the `.devcontainer` directory**. `"../src/claude-code": {}`
@@ -66,16 +68,17 @@ mean duplicating or symlinking `src/claude-code` into `.devcontainer/`, and the 
 instead. The consequence to remember: **this container lags the working tree until a release goes out**,
 so it is not a check on uncommitted `install.sh` changes — the feature test matrix is.
 
-**The test matrix runs in there, and it is the stricter environment** — the inner builds go through the
-proxy, which the host's do not. That is how the `su -` proxy bug (fixed in 0.0.2, see below) was found.
-It depends on the `proxies` block `post-create.sh` writes to `~/.docker/config.json`; without it the inner
-builds get no proxy and fail on `Could not resolve host: claude.ai`.
+**The test matrix runs in there, and it is the stricter environment** — the builds `devcontainer features
+test` drives go through the proxy, which the host's do not. That is how the `su -` proxy bug (fixed in
+0.0.2, see below) was found. Rootless Podman passes the proxy env vars into `podman build`/`podman run`
+itself (`containers.conf`'s `[engine] http_proxy` default), so unlike the old docker-in-docker setup there
+is no `~/.docker/config.json` trick in `post-create.sh` to keep in sync — `docker` itself is
+`podman-docker`'s wrapper around `podman`, installed by the feature.
 
 Two other things that bit during setup: the dev container pins `base:ubuntu-24.04`, because the floating
-`:ubuntu` tag now resolves to 26.04 "resolute", for which `docker-in-docker` has no moby packages; and
-`devcontainer up` passes `--no-recreate`, so a stale container from an earlier `.devcontainer` in this
-folder gets *started* rather than rebuilt — `docker compose -p devcontainer-features_devcontainer down
---remove-orphans` first if the config looks ignored.
+`:ubuntu` tag now resolves to 26.04 "resolute"; and `devcontainer up` passes `--no-recreate`, so a stale
+container from an earlier `.devcontainer` in this folder gets *started* rather than rebuilt — `docker
+compose -p devcontainer-features_devcontainer down --remove-orphans` first if the config looks ignored.
 
 ## Testing discipline
 

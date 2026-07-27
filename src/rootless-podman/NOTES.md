@@ -28,7 +28,7 @@ a different one would mean a third-party repository, which is out of scope here.
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "remoteUser": "vscode",
     "features": {
-        "ghcr.io/olibutzki/devcontainer-features/rootless-podman:0.0.1": {}
+        "ghcr.io/olibutzki/devcontainer-features/rootless-podman:0.0.2": {}
     },
     // Required for rootless Podman to actually start containers -- see below for why the feature
     // cannot add these two lines itself.
@@ -63,6 +63,15 @@ CI verifies that this actually works, not just that it installs: the `device_acc
 both `--device` lines and runs a real `podman run hello-world` — the same runArgs a consumer adds. The
 default test scenario (no `runArgs`) only checks installation artifacts, since without the devices a real
 container start would fail regardless of whether the feature is set up correctly.
+
+## `docker` CLI compatibility
+
+The feature also installs `podman-docker`, a Debian/Ubuntu transitional package that puts `/usr/bin/docker`
+in place as a thin wrapper execing `podman`. This is for tools that shell out to a `docker` binary directly
+rather than talking to the Docker API socket -- for example `@devcontainers/cli`, which is how this
+collection's own dev container runs the feature test matrix against rootless Podman instead of
+docker-in-docker. Installation is skipped if a real `docker` is already on `PATH`, so this stays inert
+alongside docker-in-docker/docker-outside-of-docker (see "Don't combine" below).
 
 ## Docker / Testcontainers compatibility
 

@@ -16,6 +16,10 @@ check "slirp4netns installed" bash -c "command -v slirp4netns"
 check "pasta installed (passt package)" bash -c "command -v pasta"
 check "fuse-overlayfs installed" bash -c "command -v fuse-overlayfs"
 check "catatonit package installed" bash -c "dpkg -s catatonit"
+check "podman-docker package installed" bash -c "dpkg -s podman-docker"
+
+check "docker command resolves (via podman-docker)" bash -c "command -v docker"
+check "docker is podman-docker's wrapper, not a real Docker CLI" bash -c "docker --version | grep -q '^podman version'"
 
 check "subuid range reserved for the remote user" bash -c 'grep -q "^$(id -un):" /etc/subuid'
 check "subgid range reserved for the remote user" bash -c 'grep -q "^$(id -un):" /etc/subgid'

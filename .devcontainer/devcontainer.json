@@ -19,8 +19,11 @@
 		"ghcr.io/olibutzki/devcontainer-features/claude-code:0.0.2": {
 			"version": "latest"
 		},
-		// The feature test suite builds and runs real containers.
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		// The feature test suite builds and runs real containers. Rootless, so no `privileged: true`
+		// (see docker-compose.yml for the capAdd/securityOpt the feature declares itself and the
+		// --device entries it cannot). podman-docker (installed by the feature) provides /usr/bin/docker
+		// so `devcontainer features test` keeps working unmodified.
+		"ghcr.io/olibutzki/devcontainer-features/rootless-podman:0.0.2": {},
 		// Only so that `npm i -g @devcontainers/cli` works in post-create.sh.
 		"ghcr.io/devcontainers/features/node:1": {
 			"version": "lts"

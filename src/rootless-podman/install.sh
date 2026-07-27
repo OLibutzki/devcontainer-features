@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #-------------------------------------------------------------------------------------------------------------
-# Installs rootless Podman (podman, uidmap, slirp4netns, fuse-overlayfs, catatonit), reserves a subuid/subgid
-# range for the target user, configures fuse-overlayfs as the storage driver, and installs the
-# postStartCommand script that starts `podman system service` for Docker API compatibility.
+# Installs rootless Podman (podman, uidmap, slirp4netns, fuse-overlayfs, catatonit, podman-docker), reserves
+# a subuid/subgid range for the target user, configures fuse-overlayfs as the storage driver, and installs
+# the postStartCommand script that starts `podman system service` for Docker API compatibility.
 #
 # Debian/Ubuntu only. See NOTES.md for the runArgs the CONSUMER must still add (--device=/dev/fuse and
 # --device=/dev/net/tun) -- the feature cannot declare those reliably via feature metadata, see NOTES.md
@@ -90,6 +90,17 @@ echo "Installing rootless Podman for user '${USERNAME}' ..."
 install_if_missing podman:podman newuidmap:uidmap slirp4netns:slirp4netns fuse-overlayfs:fuse-overlayfs pasta:passt
 # catatonit ships no long-lived command to probe with `type`; check the package directly.
 dpkg -s catatonit >/dev/null 2>&1 || apt_install catatonit
+
+# ---------------------------------------------------------------------------------------------------------
+# podman-docker: a transitional Debian/Ubuntu package that installs /usr/bin/docker as a thin wrapper
+# execing podman, plus /etc/containers/nodocker (suppresses podman's "Emulate Docker CLI using podman"
+# warning). Tools that only know how to shell out to a `docker` binary -- notably `@devcontainers/cli`
+# itself, which is how this repo's own dev container runs the feature test matrix -- work against podman
+# through this without any DOCKER_HOST/socket involvement. Only installed if `docker` is not already on
+# PATH, so this stays a no-op alongside docker-in-docker/docker-outside-of-docker (NOTES.md already tells
+# consumers not to combine those with this feature; a real docker binary always wins here).
+# ---------------------------------------------------------------------------------------------------------
+type docker >/dev/null 2>&1 || apt_install podman-docker
 
 # ---------------------------------------------------------------------------------------------------------
 # Reserve a subuid/subgid range. Idempotent: if the user already has an entry (some base images/useradd

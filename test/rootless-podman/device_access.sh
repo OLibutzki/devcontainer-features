@@ -13,4 +13,12 @@ check "rootless podman can actually start a container" bash -lc '
     podman run --rm hello-world
 '
 
+# Same check via the `docker` binary: proves podman-docker's wrapper -- and by extension any tool that only
+# knows how to shell out to `docker`, e.g. @devcontainers/cli -- actually works end to end, not just that
+# the binary is present (see test.sh for the install-only check).
+check "docker (podman-docker wrapper) can actually start a container" bash -lc '
+    /usr/local/bin/rootless-podman-start.sh
+    docker run --rm hello-world
+'
+
 reportResults

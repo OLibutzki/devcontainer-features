@@ -1,26 +1,34 @@
 services:
   dev:
-    # The image this feature collection is primarily tested against — pinned to
-    # the LTS, because the floating `:ubuntu` tag now resolves to 26.04
-    # "resolute", for which the docker-in-docker Feature has no moby packages
-    # ("the 'moby' option is not supported on ubuntu 'resolute'"). The feature
-    # test matrix below still runs against the floating tag; this pin only
-    # affects the container the tests are driven *from*.
+    # Pinned to the LTS rather than the floating `:ubuntu` tag (now 26.04
+    # "resolute") for a known-good base. The feature test matrix below still
+    # runs against the floating tag; this pin only affects the container the
+    # tests are driven *from*.
     image: mcr.microsoft.com/devcontainers/base:ubuntu-24.04
     init: true
     command: sleep infinity
-    # Required by the docker-in-docker Feature. It grants capabilities *inside*
-    # this container's namespaces; it does not create a route off the internal
-    # network, so the egress boundary below still holds.
-    privileged: true
+    # rootless-podman's own capAdd/securityOpt are Feature-level properties and are merged in by the
+    # devcontainer CLI automatically -- no `privileged: true` needed, that was only ever for
+    # docker-in-docker's inner daemon.
+    #
+    # --device is not a Feature-mergeable property (and devcontainer.json's `runArgs` is ignored for
+    # Compose-based configs), so the two devices rootless Podman needs to actually start containers
+    # (see src/rootless-podman/NOTES.md) are declared directly here instead.
+    devices:
+      - /dev/fuse
+      - /dev/net/tun
     volumes:
       - ../..:/workspaces:cached
       # Claude Code's credentials, settings and history. Without this you sign in
       # again after every rebuild. Compose scopes the volume to this project.
       - claude-config:/home/vscode/.claude
-      # Keep the inner Docker daemon's images out of the container's writable
-      # layer, so a rebuild does not re-pull every test base image.
-      - dind-var-lib-docker:/var/lib/docker
+      # Keep Podman's image/container storage out of the container's writable
+      # layer, so a rebuild does not re-pull every test base image. Rootless
+      # Podman's graphroot defaults to $HOME/.local/share/containers (no
+      # graphroot override in the feature's storage.conf), not under
+      # /var/lib/rootless-podman -- that path only holds the runtime socket,
+      # which is intentionally *not* persisted (see NOTES.md "Persistence").
+      - podman-storage:/home/vscode/.local/share/containers
     networks:
       # The only network this container is on, and it has `internal: true`.
       # There is no default route to the internet here — the sole way out is the
@@ -32,8 +40,9 @@ services:
         condition: service_healthy
     environment:
       # Addressed by IP, not by the `egress` service name, because containers
-      # started by the *inner* Docker daemon are not on the Compose network and
-      # cannot resolve it. They route to this address through the dev container.
+      # started by rootless Podman get their own (slirp4netns/pasta) network
+      # namespace, are not on the Compose network, and cannot resolve it. They
+      # route to this address through the dev container.
       HTTP_PROXY: http://10.99.0.2:3128
       HTTPS_PROXY: http://10.99.0.2:3128
       http_proxy: http://10.99.0.2:3128
@@ -54,7 +63,8 @@ services:
     networks:
       egress-internal:
         # Pinned so the proxy has an address that is stable across restarts and
-        # reachable from inside docker-in-docker, where Compose DNS does not go.
+        # reachable from inside rootless Podman's containers, where Compose DNS
+        # does not go.
         ipv4_address: 10.99.0.2
       egress-external: {}
     # Intentionally no `ports:` — the proxy is reachable from the dev container
@@ -77,4 +87,4 @@ networks:
 
 volumes:
   claude-config:
-  dind-var-lib-docker:
+  podman-storage:

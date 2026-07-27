@@ -116,24 +116,28 @@ Stated plainly, because a security control you misjudge is worse than none.
   access to the Docker socket. Do not mount the Docker socket into this
   container and expect the firewall to still mean anything.
 
-## docker-in-docker in this repository
+## rootless-podman in this repository
 
-This project adds the `docker-in-docker` Feature, because its test suite builds
+This project adds the `rootless-podman` Feature, because its test suite builds
 and runs real containers. That is *not* the socket mount the previous section
-warns about — there is no path to the host daemon here. The inner daemon runs in
-this container's network namespace, so the containers it starts inherit the same
-dead end: their default route is this container, which has no route off
-`egress-internal`. Their traffic reaches the same Squid and the same allowlist.
+warns about — there is no path to the host daemon here. Podman runs rootless in
+this container's network namespace (via slirp4netns/pasta), so the containers it
+starts inherit the same dead end: their default route is this container, which
+has no route off `egress-internal`. Their traffic reaches the same Squid and the
+same allowlist.
 
 Two consequences worth knowing:
 
 - The proxy is addressed as `http://10.99.0.2:3128`, not `http://egress:3128`.
-  Inner containers are not on the Compose network and cannot resolve the service
-  name; a pinned address works from both sides.
-- `privileged: true` is required by the Feature. It hands out capabilities
-  inside this container's namespaces — it does not conjure an interface that
-  reaches the internet, so the boundary is unchanged. `verify-egress.sh` is
-  what settles that; run it after any change here.
+  Podman's containers are not on the Compose network and cannot resolve the
+  service name; a pinned address works from both sides.
+- The Feature needs `capAdd: SYS_ADMIN`, three `securityOpt` entries (all
+  merged in automatically as Feature-level properties) and two `--device`
+  entries (`/dev/fuse`, `/dev/net/tun`, declared directly in
+  `docker-compose.yml` since Feature metadata has no per-device key). None of
+  that conjures an interface that reaches the internet, so the boundary is
+  unchanged — no `privileged: true` involved, unlike docker-in-docker.
+  `verify-egress.sh` is what settles that; run it after any change here.
 
 Feature-test builds started in here go through the proxy, which the host's do
 not — a stricter environment, and the reason to run the matrix from inside:

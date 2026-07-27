@@ -9,24 +9,12 @@ if [ -z "${PROXY}" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Teach the Docker CLI about the proxy.
-#
-# The inner daemon inherits HTTP_PROXY from this container's environment, so
-# image *pulls* already go through Squid. Image *builds* do not: RUN steps get a
-# clean environment, so apt-get and the native installer's curl to claude.ai
-# would hang inside a feature test build. The `proxies` block
-# makes the Docker CLI pass the proxy to every build as an implicit build arg,
-# which BuildKit exposes to RUN as environment variables.
+# Unlike the Docker CLI/BuildKit, rootless Podman does not need a config.json
+# trick to get the proxy into RUN steps: containers.conf's [engine] section
+# defaults http_proxy to true, which passes HTTP_PROXY/HTTPS_PROXY/NO_PROXY
+# (already set on this container's environment by docker-compose.yml) through
+# to both `podman run` and `podman build` automatically.
 # ---------------------------------------------------------------------------
-mkdir -p "${HOME}/.docker"
-CONFIG="${HOME}/.docker/config.json"
-[ -s "${CONFIG}" ] || echo '{}' > "${CONFIG}"
-
-tmp="$(mktemp)"
-jq --arg proxy "${PROXY}" --arg noproxy "${NO_PROXY:-}" \
-    '.proxies.default = {httpProxy: $proxy, httpsProxy: $proxy, noProxy: $noproxy}' \
-    "${CONFIG}" > "${tmp}"
-mv "${tmp}" "${CONFIG}"
 
 # ---------------------------------------------------------------------------
 # The tool this repository is developed with. Pulled through the proxy, so
