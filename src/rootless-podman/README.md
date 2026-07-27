@@ -1,3 +1,22 @@
+
+# Rootless Podman (rootless-podman)
+
+Installs rootless Podman as a Docker-compatible container engine (DOCKER_HOST, testcontainers, docker CLI via podman-docker) without requiring a privileged container.
+
+## Example Usage
+
+```json
+"features": {
+    "ghcr.io/olibutzki/devcontainer-features/rootless-podman:0": {}
+}
+```
+
+## Options
+
+| Options Id | Description | Type | Default Value |
+|-----|-----|-----|-----|
+
+
 > **Experimental (`0.x`).** Breaking changes are likely: behavior may change in any release before
 > `1.0.0`. Pin the exact patch version, never the rolling `:0` tag.
 
@@ -119,3 +138,8 @@ survive rebuilds, mount a volume over `/var/lib/rootless-podman` yourself.
 
 Debian/Ubuntu-based **Dev Container** images — CI covers `mcr.microsoft.com/devcontainers/base:ubuntu` and
 `:debian`. A non-apt base fails the build with a clear message.
+
+
+---
+
+_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/olibutzki/devcontainer-features/blob/main/src/rootless-podman/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._

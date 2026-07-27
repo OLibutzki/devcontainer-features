@@ -20,6 +20,7 @@ check "podman-docker package installed" bash -c "dpkg -s podman-docker"
 
 check "docker command resolves (via podman-docker)" bash -c "command -v docker"
 check "docker is podman-docker's wrapper, not a real Docker CLI" bash -c "docker --version | grep -q '^podman version'"
+check "nodocker file suppresses the emulation warning" bash -c "test -f /etc/containers/nodocker && ! docker --version 2>&1 >/dev/null | grep -q 'Emulate Docker CLI'"
 
 check "subuid range reserved for the remote user" bash -c 'grep -q "^$(id -un):" /etc/subuid'
 check "subgid range reserved for the remote user" bash -c 'grep -q "^$(id -un):" /etc/subgid'

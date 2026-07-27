@@ -93,14 +93,21 @@ dpkg -s catatonit >/dev/null 2>&1 || apt_install catatonit
 
 # ---------------------------------------------------------------------------------------------------------
 # podman-docker: a transitional Debian/Ubuntu package that installs /usr/bin/docker as a thin wrapper
-# execing podman, plus /etc/containers/nodocker (suppresses podman's "Emulate Docker CLI using podman"
-# warning). Tools that only know how to shell out to a `docker` binary -- notably `@devcontainers/cli`
-# itself, which is how this repo's own dev container runs the feature test matrix -- work against podman
-# through this without any DOCKER_HOST/socket involvement. Only installed if `docker` is not already on
-# PATH, so this stays a no-op alongside docker-in-docker/docker-outside-of-docker (NOTES.md already tells
-# consumers not to combine those with this feature; a real docker binary always wins here).
+# execing podman. Tools that only know how to shell out to a `docker` binary -- notably
+# `@devcontainers/cli` itself, which is how this repo's own dev container runs the feature test matrix --
+# work against podman through this without any DOCKER_HOST/socket involvement. Only installed if `docker`
+# is not already on PATH, so this stays a no-op alongside docker-in-docker/docker-outside-of-docker
+# (NOTES.md already tells consumers not to combine those with this feature; a real docker binary always
+# wins here).
 # ---------------------------------------------------------------------------------------------------------
-type docker >/dev/null 2>&1 || apt_install podman-docker
+if ! type docker >/dev/null 2>&1; then
+    apt_install podman-docker
+    # The package itself does not create this -- without it, every `docker` invocation prints "Emulate
+    # Docker CLI using podman. Create /etc/containers/nodocker to quiet msg." on stderr. Verified empirically
+    # against podman-docker 5.6.2-1 (Ubuntu 24.04) and 5.5.0+ds1-4 (Debian 13): the warning is unconditional
+    # until this file exists.
+    touch /etc/containers/nodocker
+fi
 
 # ---------------------------------------------------------------------------------------------------------
 # Reserve a subuid/subgid range. Idempotent: if the user already has an entry (some base images/useradd
