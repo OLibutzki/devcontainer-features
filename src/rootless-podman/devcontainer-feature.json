@@ -24,8 +24,7 @@
     ],
     "securityOpt": [
         "seccomp=unconfined",
-        "apparmor=unconfined",
-        "systempaths=unconfined"
+        "apparmor=unconfined"
     ],
     "postStartCommand": "/usr/local/bin/rootless-podman-start.sh",
     "installsAfter": [

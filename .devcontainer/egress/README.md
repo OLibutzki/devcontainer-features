@@ -78,9 +78,12 @@ a decision about, which is the point of the whole arrangement.
 bash .devcontainer/egress/verify-egress.sh
 ```
 
-Four checks: the proxy variables are set, an allowlisted host is reachable, a
-non-allowlisted host is refused, and — the one that matters — bypassing the
-proxy reaches nothing. Run it after any change to the Compose file.
+Four pass/fail checks: the proxy variables are set, an allowlisted host is
+reachable, a non-allowlisted host is refused, and — the one that matters —
+bypassing the proxy reaches nothing. Plus one informational `NOTE`: whether
+external DNS still resolves, since that residual channel (see "Limitations")
+is deliberately *not* closed and worth keeping visible. Run it after any change
+to the Compose file.
 
 ## Build time is not covered
 
@@ -108,10 +111,20 @@ Stated plainly, because a security control you misjudge is worse than none.
   resolution therefore still succeeds even where connections do not, and a
   determined process could tunnel data out over DNS queries. This setup does
   not close that. It restricts *connections*, not *all information flow*.
-- **Granularity is the domain.** Allowlisting `github.com` allowlists all of
-  GitHub, including repositories you did not intend. Filtering by URL path
-  would require TLS interception (SSL bump), which was deliberately avoided so
-  that no CA has to be trusted inside the container.
+- **Granularity is the domain, and some allowed domains are multi-tenant
+  storage.** Allowlisting `github.com` allowlists all of GitHub, including
+  repositories you did not intend. Worse, several entries the tools require are
+  shared content platforms whose *contents* are attacker-controllable:
+  `storage.googleapis.com` (any public Google Cloud Storage bucket, readable
+  and — for an attacker's own bucket — writable), `.githubusercontent.com`
+  (any raw repo/gist content) and `.vscode.blob.core.windows.net` (Azure blob
+  subdomains). Because Squid tunnels HTTPS without decrypting, it cannot tell
+  legitimate tool traffic to those hosts from data exfiltration or C2 to an
+  attacker-owned bucket on the same host. Treat this allowlist as controlling
+  *which platforms* are reachable, not *what data leaves through them*.
+  Filtering by URL path or bucket would require TLS interception (SSL bump),
+  which was deliberately avoided so that no CA has to be trusted inside the
+  container.
 - **A compromised host Docker daemon is out of scope**, as is anything with
   access to the Docker socket. Do not mount the Docker socket into this
   container and expect the firewall to still mean anything.
@@ -131,13 +144,17 @@ Two consequences worth knowing:
 - The proxy is addressed as `http://10.99.0.2:3128`, not `http://egress:3128`.
   Podman's containers are not on the Compose network and cannot resolve the
   service name; a pinned address works from both sides.
-- The Feature needs `capAdd: SYS_ADMIN`, three `securityOpt` entries (all
-  merged in automatically as Feature-level properties) and two `--device`
-  entries (`/dev/fuse`, `/dev/net/tun`, declared directly in
-  `docker-compose.yml` since Feature metadata has no per-device key). None of
-  that conjures an interface that reaches the internet, so the boundary is
-  unchanged — no `privileged: true` involved, unlike docker-in-docker.
-  `verify-egress.sh` is what settles that; run it after any change here.
+- The Feature needs `capAdd: SYS_ADMIN`, two `securityOpt` entries
+  (`seccomp=unconfined`, `apparmor=unconfined` — merged in automatically as
+  Feature-level properties) and two `--device` entries (`/dev/fuse`,
+  `/dev/net/tun`, declared directly in `docker-compose.yml` since Feature
+  metadata has no per-device key). None of that conjures an interface that
+  reaches the internet, so the **egress** boundary is unchanged — no
+  `privileged: true` involved, unlike docker-in-docker. `verify-egress.sh` is
+  what settles that; run it after any change here. Note this is a statement
+  about *network* egress only: those same grants do lower the container→host
+  isolation on a different axis — see `src/rootless-podman/NOTES.md`
+  ("Security posture") and run this container's outer engine userns-remapped.
 
 Feature-test builds started in here go through the proxy, which the host's do
 not — a stricter environment, and the reason to run the matrix from inside:

@@ -25,6 +25,9 @@ claude.ai
 claude.com
 platform.claude.com
 downloads.claude.ai
+# CAUTION: multi-tenant storage. Allowing this host allows *any* public Google
+# Cloud Storage bucket, in both directions — it is an open data channel, not a
+# narrow Claude endpoint. See egress/README.md "Granularity is the domain".
 storage.googleapis.com
 code.claude.com
 
@@ -38,6 +41,9 @@ code.claude.com
 # HTTPS remotes only; the proxy does not tunnel SSH, so git@github.com will not
 # work. .githubusercontent.com covers raw (the /release-notes changelog feed),
 # objects, and the pkg-containers blob store that ghcr.io redirects to.
+# CAUTION: .githubusercontent.com serves arbitrary user content (any repo/gist
+# raw file), so like storage.googleapis.com it is an attacker-usable exfil/C2
+# channel, not a narrow endpoint. See egress/README.md.
 github.com
 .githubusercontent.com
 

@@ -15,6 +15,9 @@ failures=0
 
 pass() { printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; failures=$((failures + 1)); }
+# NOTE is informational only — it never increments failures. It surfaces a known,
+# accepted residual channel rather than pretending it is closed.
+note() { printf '  \033[33mNOTE\033[0m  %s\n' "$1"; }
 
 echo
 echo "Egress firewall check"
@@ -45,6 +48,20 @@ if curl -sS --noproxy '*' -o /dev/null --max-time 10 "${DIRECT_URL}" 2>/dev/null
     fail "the container reached the internet WITHOUT the proxy — the 'internal: true' network has been lost"
 else
     pass "no route to the internet outside the proxy"
+fi
+
+# DNS is a known residual channel, NOT a failure (see egress/README.md
+# "Limitations"): Docker's embedded resolver at 127.0.0.11 forwards external
+# lookups, so a non-allowlisted name still resolves even though no connection to
+# it can be made. That is a covert exfil path (data encoded in query labels) the
+# proxy does not close. Surfaced here so it stays visible, using a name that is
+# neither allowlisted nor in /etc/hosts, so a positive result means the embedded
+# resolver really did recurse to the outside.
+if getent hosts nonexistent-egress-probe.example.com >/dev/null 2>&1 \
+    || getent hosts example.com >/dev/null 2>&1; then
+    note "external DNS still resolves — DNS is a residual exfil channel (data can leave via query labels); see egress/README.md"
+else
+    pass "external DNS does not resolve (residual DNS channel is also closed)"
 fi
 
 echo

@@ -131,8 +131,13 @@ plugin. It sets no `containerEnv` at present.
   firewall feature here.
 - **`rootless-podman`: device access is documented, not automated.** Rootless Podman needs `/dev/fuse` (for
   `fuse-overlayfs`) and `/dev/net/tun` (for `slirp4netns`) to actually start containers. The feature declares
-  `capAdd: ["SYS_ADMIN"]` and the three `securityOpt` entries it needs directly in
-  `devcontainer-feature.json` — those are safe, aggregating top-level properties. Devices are different: a
+  `capAdd: ["SYS_ADMIN"]` and the two `securityOpt` entries it needs (`seccomp=unconfined`,
+  `apparmor=unconfined`) directly in `devcontainer-feature.json` — those are aggregating top-level
+  properties in the *metadata* sense (not subject to the `${localEnv:...}` restriction), which is not the
+  same as being harmless: SYS_ADMIN + both MAC profiles off materially lowers container→host isolation, so
+  NOTES.md now carries a "Security posture" section and the guidance to run the outer engine
+  userns-remapped. `systempaths=unconfined` was deliberately dropped (it un-masked host `/proc`/`/sys`
+  tunables Podman never needs); do not re-add it. Devices are different: a
   bind-mounted device node is visible but not usable, because the container engine's device cgroup still
   blocks it; only `--device` (or `privileged: true`) opens that up, and neither is a Feature-metadata
   key that targets a single device. Setting `privileged: true` would defeat the point of a *rootless*
