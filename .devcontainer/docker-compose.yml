@@ -18,7 +18,13 @@ services:
       - /dev/fuse
       - /dev/net/tun
     volumes:
-      - ../..:/workspaces:cached
+      # Mount ONLY this repository, not the whole parent directory. The former
+      # `../..:/workspaces` exposed the entire host drive (every sibling repo)
+      # to anything running in the container -- an unacceptable blast radius for
+      # a sandbox. `..` is this repo's root (docker-compose.yml lives in
+      # .devcontainer/), mapped to the workspaceFolder declared in
+      # devcontainer.json. Keep the two paths in sync if either changes.
+      - ..:/workspaces/devcontainer-features:cached
       # Claude Code's credentials, settings and history. Without this you sign in
       # again after every rebuild. Compose scopes the volume to this project.
       - claude-config:/home/vscode/.claude

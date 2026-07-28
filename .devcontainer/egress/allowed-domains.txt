@@ -25,10 +25,16 @@ claude.ai
 claude.com
 platform.claude.com
 downloads.claude.ai
-storage.googleapis.com
 code.claude.com
 
 # Not listed, deliberately:
+#   storage.googleapis.com — a generic Google Cloud Storage host: allowlisting
+#     it opens *any* GCS bucket as an exfiltration channel, which defeats the
+#     point of a default-deny egress policy. Removed for that reason. Claude
+#     Code reaches its own assets via downloads.claude.ai / code.claude.com; if
+#     a future release genuinely needs a GCS-hosted download the proxy log will
+#     name it (docker compose logs egress | grep TCP_DENIED) -- re-add it then,
+#     ideally narrowed to the specific bucket host rather than the bare domain.
 #   the two Datadog intake hosts — optional telemetry, turned off instead with
 #   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 in docker-compose.yml.
 #   mcp-proxy.anthropic.com    — only for claude.ai MCP connectors.
