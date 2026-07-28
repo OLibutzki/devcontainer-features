@@ -7,7 +7,7 @@ Installs rootless Podman as a Docker-compatible container engine (DOCKER_HOST, t
 
 ```json
 "features": {
-    "ghcr.io/olibutzki/devcontainer-features/rootless-podman:0": {}
+    "ghcr.io/OLibutzki/devcontainer-features/rootless-podman:0": {}
 }
 ```
 
