@@ -165,10 +165,6 @@ fi
 # by a UID that no longer belongs to anyone, and the (now different) user could not write to it. So this
 # only prepares a sticky, world-writable base; rootless-podman-start.sh creates and owns "run" fresh on
 # every container start, once the user's final UID is already in effect.
-#
-# The flip side of a world-writable, predictable base path is a squatting/symlink surface on the "run"
-# subdirectory; rootless-podman-start.sh guards against that at start time (it refuses to adopt a "run" it
-# does not own) rather than trusting the base dir's contents blindly.
 # ---------------------------------------------------------------------------------------------------------
 mkdir -p "${RUNTIME_BASE}"
 chmod 1777 "${RUNTIME_BASE}"

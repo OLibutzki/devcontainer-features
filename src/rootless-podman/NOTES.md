@@ -45,39 +45,10 @@ Without `--device=/dev/fuse`, `podman run` fails with `fuse: device not found`. 
 
 ## Why `/dev/fuse` and `/dev/net/tun` are not automatic
 
-The feature already declares `capAdd: ["SYS_ADMIN"]` and the two `securityOpt` entries it needs
-(`seccomp=unconfined`, `apparmor=unconfined`) directly in `devcontainer-feature.json` — those are regular,
-aggregating top-level Feature properties, so no consumer action is needed for them.
-
-`systempaths=unconfined` is **deliberately not** among them. That option removes Docker's default masking
-and read-only binds on `/proc` and `/sys` — exposing host-global kernel tunables such as
-`/proc/sys/kernel/core_pattern` (a classic container→host escalation primitive), `/proc/sysrq-trigger`
-(host DoS) and `/proc/kcore` (raw kernel memory). Rootless Podman does not need any of that: it creates its
-user/mount namespaces and mounts `fuse-overlayfs` without writing to those paths. Un-masking them only
-widens the container→host attack surface, so the entry was dropped. If a future Podman release genuinely
-needs one masked path, add that single path back — never re-enable the blanket `systempaths=unconfined`.
-
-## Security posture — what this feature costs you
-
-State it plainly, because a control you misjudge is worse than none. `capAdd: SYS_ADMIN` plus
-`seccomp=unconfined` and `apparmor=unconfined` **materially lower the isolation between this container and
-the host.** `SYS_ADMIN` is the most powerful Linux capability, and with both mandatory-access-control
-profiles off, a process that reaches **root inside the container** (note: the `vscode` user on the standard
-Dev Container base images has passwordless `sudo`) has a broad kernel attack surface. This is close to what
-`privileged: true` would grant on the capability/profile axis — the feature avoids `privileged` on the
-*device* axis, not this one.
-
-Whether that root-in-container position can actually reach the *host* depends on the outer engine:
-
-* **With user-namespace remapping** (rootless Docker/Podman daemon, or `userns-remap` on a rootful daemon),
-  container-root maps to an unprivileged host UID, which neutralises most `SYS_ADMIN`-based escapes. **This
-  is the recommended way to run any container that uses this feature.**
-* **Without it** (a default rootful Docker daemon, common on Linux CI runners and WSL2), container-root *is*
-  host-root, and the grants above are a real escape surface.
-
-Do not install this feature on a host that runs untrusted or multi-tenant workloads unless the outer engine
-is userns-remapped. It is built for a single-developer dev container, where the trust boundary is the
-developer's own machine.
+The feature already declares `capAdd: ["SYS_ADMIN"]` and the three `securityOpt` entries it needs
+(`seccomp=unconfined`, `apparmor=unconfined`, `systempaths=unconfined`) directly in
+`devcontainer-feature.json` — those are regular, aggregating top-level Feature properties, so no consumer
+action is needed for them.
 
 Device access is different. Bind-mounting a device node (`"mounts": ["source=/dev/fuse,target=/dev/fuse,type=bind"]`)
 makes the file *visible* inside the container, but the container engine's device cgroup still blocks

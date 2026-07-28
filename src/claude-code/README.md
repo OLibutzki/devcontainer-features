@@ -166,17 +166,6 @@ build log says `Forwarding the build-time proxy configuration to the installer.`
 `claude.ai` and `downloads.claude.ai` must be reachable through the proxy for the install to work, and
 `api.anthropic.com` for the CLI to be usable afterwards.
 
-## Sandboxed Bash tool dependencies
-
-The feature installs `bubblewrap` and `socat` alongside Claude Code. Neither is something this feature turns
-on: they back the CLI's own sandboxed Bash tool, which is gated by `sandbox.enabled` /
-`sandbox.failIfUnavailable` in `settings.json` — settings that can end up true from a user's or org's own
-config, or from Anthropic's own default rollout, entirely outside this feature's control. Without the two
-packages, a session that needs the sandbox fails hard with `Sandbox is required but failed to initialize:
-Sandbox dependencies not available: socat not installed.` instead of falling back quietly, so both are
-installed unconditionally rather than guessed at from current settings. This is unrelated to the
-`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` mechanism below, which also uses `bwrap` but for a different purpose.
-
 ## OS support
 
 Debian/Ubuntu-based **Dev Container** images on x64 or arm64 — CI covers
